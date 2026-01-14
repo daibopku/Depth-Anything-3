@@ -31,6 +31,10 @@ from PIL import Image
 from depth_anything_3.cfg import create_object, load_config
 from depth_anything_3.registry import MODEL_REGISTRY
 from depth_anything_3.specs import Prediction
+from depth_anything_3.utils.object_3d_detection import (
+    Object3DBoundingBoxes,
+    compute_3d_bboxes_from_prediction,
+)
 from depth_anything_3.utils.export import export
 from depth_anything_3.utils.geometry import affine_inverse
 from depth_anything_3.utils.io.input_processor import InputProcessor
@@ -271,6 +275,54 @@ class DepthAnything3(nn.Module, PyTorchModelHubMixin):
             self._export_results(prediction, export_format, export_dir, **export_kwargs)
 
         return prediction
+
+    def detect_3d_bounding_boxes(
+        self,
+        video: np.ndarray,
+        mask: np.ndarray,
+        *,
+        min_points: int = 200,
+        conf_thresh: float = 1.05,
+        inference_kwargs: Optional[dict] = None,
+    ) -> Object3DBoundingBoxes:
+        """High-level helper: video + mask -> 3D boxes + remapped mask.
+
+        Pipeline:
+        1) Run DA3 inference on the video frames to get depth/pose.
+        2) Back-project masked pixels to world-space point clouds.
+        3) Use XY-plane PCA (global) to define x/y, keep world z, then compute per-frame
+           oriented boxes (center + size).
+        4) Filter objects with fewer than ``min_points`` total 3D points and remap masks
+           to the surviving objects, ordered by descending point count.
+
+        Args:
+            video: ``(F, H, W, 3)`` uint8/float32 numpy array.
+            mask: ``(F, H, W)`` integer object ids (0 = background).
+            min_points: Minimum total 3D points (across all frames) to keep an object.
+            conf_thresh: Confidence threshold applied before back-projection.
+            inference_kwargs: Optional kwargs forwarded to :meth:`inference` (e.g.,
+                ``process_res``, ``process_res_method``).
+
+        Returns:
+            ``Object3DBoundingBoxes`` containing ``bboxes`` (F, N, 6) and remapped ``mask``.
+        """
+
+        if video.ndim != 4:
+            raise ValueError(f"video must be (F,H,W,3), got shape {video.shape}")
+        if video.shape[0] != mask.shape[0]:
+            raise ValueError("video and mask must share the same frame count")
+
+        inference_kwargs = inference_kwargs or {}
+        frames = [video[i] for i in range(video.shape[0])]
+
+        prediction = self.inference(frames, **inference_kwargs)
+
+        return compute_3d_bboxes_from_prediction(
+            prediction,
+            mask,
+            min_points=min_points,
+            conf_thresh=conf_thresh,
+        )
 
     def _preprocess_inputs(
         self,
