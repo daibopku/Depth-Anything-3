@@ -54,6 +54,7 @@ class Object3DBoundingBoxes:
     mask_size: tuple[int, int] | None = None
     depth: np.ndarray | None = None
     conf: np.ndarray | None = None
+    fps: float | None = None
 
 
 def compute_3d_bboxes_from_prediction(
