@@ -14,8 +14,6 @@ authors = [{ name = "Your Name" }]
 dependencies = [
     "pre-commit",
     "trimesh",
-    "torch>=2",
-    "torchvision",
     "einops",
     "huggingface_hub",
     "imageio",
@@ -35,6 +33,9 @@ dependencies = [
     "plyfile",
     "pillow_heif",
     "safetensors",
+    "faiss-gpu",
+    "pypose",
+    "numba",
     "uvicorn",
     "moviepy==1.0.3",
     "typer>=0.9.0",
@@ -86,9 +87,11 @@ exclude = '''
 profile = "black"
 multi_line_output = 3
 include_trailing_comma = true
-known_third_party = ["bson","cruise","cv2","dataloader","diffusers","omegaconf","tensorflow","torch","torchvision","transformers","gsplat"]
 known_first_party = ["common", "data", "models", "projects"]
 sections = ["FUTURE","STDLIB","THIRDPARTY","FIRSTPARTY","LOCALFOLDER"]
 skip_gitignore = true
 line_length = 99
 no_lines_before="THIRDPARTY"
+
+[tool.uv.pip]
+extra-index-url = ["https://download.pytorch.org/whl/cu128"]
